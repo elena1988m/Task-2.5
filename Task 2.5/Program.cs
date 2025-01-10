@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Text;
+
 class Program
 {
     static void Main()
@@ -6,46 +8,62 @@ class Program
         Console.WriteLine("Введіть ланцюг ДНК (тільки символи A, C, G, T):");
         string dnaChain = Console.ReadLine();
 
-        string compressed = Compress(dnaChain);
-        Console.WriteLine("Стиснений ланцюг ДНК: " + compressed);
+        byte[] compressed = Compress(dnaChain);
+        Console.WriteLine("Стиснений ланцюг ДНК (у вигляді байтів): " + BitConverter.ToString(compressed));
 
-        string decompressed = Decompress(compressed);
+        string decompressed = Decompress(compressed, dnaChain.Length);
         Console.WriteLine("Відновлений ланцюг ДНК: " + decompressed);
     }
 
-    static string Compress(string input)
+    static byte[] Compress(string input)
     {
-        string result = "";
-        int count = 1;
+        int length = input.Length;
+        int byteCount = (length + 3) / 4;
+        byte[] compressed = new byte[byteCount];
 
-        for (int i = 1; i <= input.Length; i++)
+        for (int i = 0; i < length; i++)
         {
-            if (i < input.Length && input[i] == input[i - 1])
+            int byteIndex = i / 4;
+            int bitOffset = (i % 4) * 2;
+
+            byte encodedNucleotide = input[i] switch
             {
-                count++;
-            }
-            else
-            {
-                result += input[i - 1] + count.ToString();
-                count = 1;
-            }
+                'A' => 0b00,
+                'C' => 0b01,
+                'G' => 0b10,
+                'T' => 0b11,
+                _ => throw new ArgumentException("Недопустимий символ")
+            };
+
+            compressed[byteIndex] |= (byte)(encodedNucleotide << (6 - bitOffset));
         }
-        return result;
+
+        return compressed;
     }
 
-    static string Decompress(string input)
+    static string Decompress(byte[] compressed, int originalLength)
     {
-        string result = "";
-        for (int i = 0; i < input.Length; i += 2)
-        {
-            char nucleotide = input[i]; 
-            int count = int.Parse(input[i + 1].ToString()); 
+        StringBuilder result = new StringBuilder(originalLength);
 
-            for (int j = 0; j < count; j++)
+        for (int i = 0; i < originalLength; i++)
+        {
+            int byteIndex = i / 4;
+            int bitOffset = (i % 4) * 2;
+
+            byte encodedNucleotide = (byte)((compressed[byteIndex] >> (6 - bitOffset)) & 0b11);
+
+            char nucleotide = encodedNucleotide switch
             {
-                result += nucleotide; 
-            }
+                0b00 => 'A',
+                0b01 => 'C',
+                0b10 => 'G',
+                0b11 => 'T',
+                _ => throw new ArgumentException("Помилка декомпресії")
+            };
+
+            result.Append(nucleotide);
         }
-        return result;
+
+        return result.ToString();
     }
 }
